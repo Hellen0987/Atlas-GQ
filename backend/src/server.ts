@@ -1,52 +1,44 @@
-import express from "express";
+import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import dotenv from "dotenv";
-import authRoutes from "./routes/auth";
-import productRoutes from "./routes/product";
-import salesRoutes from "./routes/sales";
-import inspectionRoutes from "./routes/inspection";
-import path from "path";
 
 dotenv.config();
-const app = express();
-const PORT = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const app: Express = express();
+const PORT = process.env.PORT || 3000;
 
-// Static uploads
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+// Middleware de segurança
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:5173",
+  credentials: true,
+}));
 
-// Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productRoutes);
-app.use("/api/sales", salesRoutes);
-app.use("/api/inspections", inspectionRoutes);
+// Parser
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Dashboard stats
-app.get("/api/stats", async (req: any, res: any) => {
-  try {
-    const prisma = require("./database/prismaClient").default;
-    const [totalProducts, totalSales, lowStock] = await Promise.all([
-      prisma.product.count(),
-      prisma.sale.count(),
-      prisma.product.count({ where: { estoque: { lt: prisma.product.fields.estoque_min } } })
-    ]);
-    res.json({ totalProducts, totalSales, lowStock });
-  } catch (err: any) {
-    res.status(500).json({ message: err.message });
-  }
+// Health check
+app.get("/health", (req: Request, res: Response) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Basic health
-app.get("/health", (req, res) => res.json({ status: "ok" }));
-
-app.use((err: any, req: any, res: any, next: any) => {
+// Error handling middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error(err);
-  res.status(500).json({ message: "Erro interno" });
+  res.status(err.status || 500).json({
+    error: err.message || "Internal server error",
+  });
+});
+
+// 404
+app.use((req: Request, res: Response) => {
+  res.status(404).json({ error: "Route not found" });
 });
 
 app.listen(PORT, () => {
-  console.log(`Backend rodando na porta ${PORT}`);
+  console.log(`🚀 Backend rodando em http://localhost:${PORT}`);
 });
+
+export default app;

@@ -7,67 +7,376 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ====== USERS & ROLES ======
+
 model User {
-  id        Int      @id @default(autoincrement())
-  nome      String
+  id        String   @id @default(cuid())
   email     String   @unique
-  senha     String
-  cargo     String?
-  perfil    String   @default("funcionario")
-  status    String   @default("ativo")
+  password  String
+  name      String
+  avatar    String?
+  phone     String?
+  role      UserRole @default(EMPLOYEE)
+  status    String   @default("active")
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  // Relationships
+  employee   Employee?
+  sales      Sale[]
+  auditLogs  AuditLog[]
+  notification Notification[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  vendas    Sale[]
+
+  @@index([companyId])
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+model Company {
+  id   String @id @default(cuid())
+  name String
+  cnpj String @unique
+  email String
+  phone String?
+  address String?
+  city String?
+  state String?
+  logo String?
+
+  // Relationships
+  users       User[]
+  products    Product[]
+  categories  Category[]
+  customers   Customer[]
+  suppliers   Supplier[]
+  employees   Employee[]
+  sales       Sale[]
+  financials  FinancialTransaction[]
+  inspections Inspection[]
+  auditLogs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ====== PRODUCTS & CATEGORIES ======
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
 model Product {
-  id            Int      @id @default(autoincrement())
-  codigo        String?  @unique
-  nome          String
-  categoria     String?
-  descricao     String?
-  estoque       Int      @default(0)
-  estoque_min   Int      @default(0)
-  preco_compra  Float?   @default(0)
-  preco_venda   Float?   @default(0)
-  fornecedor_id Int?
-  imagem        String?
-  status        String   @default("ativo")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  itensVenda    SaleItem[]
+  id              String    @id @default(cuid())
+  code            String
+  name            String
+  description     String?
+  price           Float
+  costPrice       Float
+  quantity        Int       @default(0)
+  minQuantity     Int       @default(10)
+  image           String?
+  barcode         String?
+  sku             String?
+  status          String    @default("active")
+  
+  category        Category  @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId      String?
+
+  // Relationships
+  saleItems       SaleItem[]
+  stockMovements  StockMovement[]
+  inspections     Inspection[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([supplierId])
 }
 
+// ====== STOCK ======
+
+model StockMovement {
+  id          String    @id @default(cuid())
+  type        String    // "entrada" | "saida" | "ajuste" | "venda" | "devolucao"
+  quantity    Int
+  reason      String?
+  reference   String?   // ID da venda, ordem de compra, etc
+  
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  createdAt   DateTime  @default(now())
+
+  @@index([productId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+// ====== CUSTOMERS ======
+
+model Customer {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  cpfCnpj     String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  type        String    @default("pessoa_fisica") // pessoa_fisica | pessoa_juridica
+  status      String    @default("active")
+  creditLimit Float     @default(0)
+  
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  // Relationships
+  sales       Sale[]
+  financials  FinancialTransaction[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, cpfCnpj])
+  @@index([companyId])
+}
+
+// ====== SUPPLIERS ======
+
+model Supplier {
+  id          String    @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  cpfCnpj     String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  contact     String?
+  bankData    String?
+  status      String    @default("active")
+  
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  // Relationships
+  products    Product[]
+  financials  FinancialTransaction[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([companyId, cpfCnpj])
+  @@index([companyId])
+}
+
+// ====== SALES ======
+
 model Sale {
-  id         Int       @id @default(autoincrement())
-  cliente    String?
-  data       DateTime  @default(now())
-  valorTotal Float     @default(0)
-  formaPagamento String?
-  vendedorId Int?
-  vendedor   User?     @relation(fields: [vendedorId], references: [id])
-  itens      SaleItem[]
+  id              String    @id @default(cuid())
+  number          String
+  status          String    @default("pending") // pending | completed | cancelled
+  paymentStatus   String    @default("pending") // pending | partial | completed
+  paymentMethod   String?   // dinheiro | credito | debito | pix | boleto
+  
+  subtotal        Float     @default(0)
+  discount        Float     @default(0)
+  tax             Float     @default(0)
+  total           Float     @default(0)
+  
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  customerId      String?
+  seller          User?     @relation(fields: [sellerId], references: [id])
+  sellerId        String?
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+
+  // Relationships
+  items           SaleItem[]
+  financials      FinancialTransaction[]
+  auditLogs       AuditLog[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([sellerId])
+  @@index([createdAt])
 }
 
 model SaleItem {
-  id        Int     @id @default(autoincrement())
-  vendaId   Int
-  produtoId Int
-  quantidade Int
-  valorUnitario Float
-  venda     Sale    @relation(fields: [vendaId], references: [id])
-  produto   Product @relation(fields: [produtoId], references: [id])
+  id          String    @id @default(cuid())
+  quantity    Int
+  price       Float
+  discount    Float     @default(0)
+  tax         Float     @default(0)
+  subtotal    Float
+  
+  sale        Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleId      String
+  product     Product   @relation(fields: [productId], references: [id])
+  productId   String
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([saleId])
+  @@index([productId])
 }
 
+// ====== FINANCEIRO ======
+
+model FinancialTransaction {
+  id          String    @id @default(cuid())
+  type        String    // "receita" | "despesa"
+  category    String    // "venda" | "pagamento" | "salary" | "material" | "utilidades"
+  description String
+  amount      Float
+  status      String    @default("pending") // pending | completed | cancelled
+  dueDate     DateTime?
+  paymentDate DateTime?
+  document    String?
+  
+  sale        Sale?     @relation(fields: [saleId], references: [id])
+  saleId      String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  customerId  String?
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  supplierId  String?
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([type])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// ====== EMPLOYEES ======
+
+model Employee {
+  id              String    @id @default(cuid())
+  name            String
+  cpf             String    @unique
+  email           String?
+  phone           String?
+  address         String?
+  department      String
+  position        String
+  salary          Float
+  hireDate        DateTime
+  status          String    @default("active") // active | inactive | on_leave
+  photo           String?
+  
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String    @unique
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+// ====== QUALITY CONTROL ======
+
 model Inspection {
-  id               Int      @id @default(autoincrement())
-  produtoId        Int
-  lote             String?
-  responsavel      String?
-  data             DateTime @default(now())
-  resultado        String
-  conforme         Boolean
-  descricao        String?
-  acaoCorretiva    String?
-  status           String   @default("aberto")
+  id              String    @id @default(cuid())
+  batch           String
+  status          String    @default("aberto") // aberto | fechado | rejeitado
+  result          String    // "conforme" | "nao_conforme" | "pendente"
+  conformity      Boolean   @default(false)
+  description     String?
+  correctiveAction String?
+  
+  product         Product   @relation(fields: [productId], references: [id])
+  productId       String
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId       String
+
+  attachments     String[]  @default([])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([status])
+}
+
+// ====== AUDIT LOG ======
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  action      String    // "create" | "update" | "delete" | "login" | "logout"
+  entity      String    // "User" | "Product" | "Sale" | "Customer", etc
+  entityId    String
+  changes     Json?     // { field: { old: value, new: value } }
+  
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId   String
+
+  createdAt   DateTime  @default(now())
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+// ====== NOTIFICATIONS ======
+
+model Notification {
+  id          String    @id @default(cuid())
+  title       String
+  message     String
+  type        String    // "info" | "warning" | "error" | "success"
+  read        Boolean   @default(false)
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  @@index([userId])
+  @@index([createdAt])
 }

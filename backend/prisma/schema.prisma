@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  email     String   @unique
+  senha     String
+  cargo     String?
+  perfil    String   @default("funcionario")
+  status    String   @default("ativo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  vendas    Sale[]
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  codigo        String?  @unique
+  nome          String
+  categoria     String?
+  descricao     String?
+  estoque       Int      @default(0)
+  estoque_min   Int      @default(0)
+  preco_compra  Float?   @default(0)
+  preco_venda   Float?   @default(0)
+  fornecedor_id Int?
+  imagem        String?
+  status        String   @default("ativo")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  itensVenda    SaleItem[]
+}
+
+model Sale {
+  id         Int       @id @default(autoincrement())
+  cliente    String?
+  data       DateTime  @default(now())
+  valorTotal Float     @default(0)
+  formaPagamento String?
+  vendedorId Int?
+  vendedor   User?     @relation(fields: [vendedorId], references: [id])
+  itens      SaleItem[]
+}
+
+model SaleItem {
+  id        Int     @id @default(autoincrement())
+  vendaId   Int
+  produtoId Int
+  quantidade Int
+  valorUnitario Float
+  venda     Sale    @relation(fields: [vendaId], references: [id])
+  produto   Product @relation(fields: [produtoId], references: [id])
+}
+
+model Inspection {
+  id               Int      @id @default(autoincrement())
+  produtoId        Int
+  lote             String?
+  responsavel      String?
+  data             DateTime @default(now())
+  resultado        String
+  conforme         Boolean
+  descricao        String?
+  acaoCorretiva    String?
+  status           String   @default("aberto")
+}

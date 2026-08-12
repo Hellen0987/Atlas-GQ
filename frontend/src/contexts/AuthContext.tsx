@@ -1,31 +1,43 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import API, { setAuthToken } from "../services/api";
+import API from "../services/api";
+
+interface User {
+  id: number;
+  nome: string;
+  email: string;
+  perfil: string;
+}
 
 interface AuthContextType {
   token: string | null;
-  user: any | null;
+  user: User | null;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
-  const [user, setUser] = useState<any>(localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")!) : null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
+  // Restore from localStorage on mount
   useEffect(() => {
-    setAuthToken(token || undefined);
-  }, [token]);
+    const savedToken = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("user");
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
 
   async function login(email: string, senha: string) {
     const res = await API.post("/auth/login", { email, senha });
-    const { token: t, user: u } = res.data;
-    setToken(t);
-    setUser(u);
-    localStorage.setItem("token", t);
-    localStorage.setItem("user", JSON.stringify(u));
-    setAuthToken(t);
+    const { token, user } = res.data;
+    setToken(token);
+    setUser(user);
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
   }
 
   function logout() {
@@ -33,11 +45,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    setAuthToken(undefined);
   }
 
-  return <AuthContext.Provider value={{ token, user, login, logout }}>{children}</AuthContext.Provider>;
-};
+  return (
+    <AuthContext.Provider value={{ token, user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
-export const useAuth = () => useContext(AuthContext);
-export default AuthContext;
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+  return context;
+}

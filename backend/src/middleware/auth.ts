@@ -6,18 +6,19 @@ dotenv.config();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 
 export interface AuthRequest extends Request {
-  user?: any;
+  user?: { id: number; email: string; perfil: string };
 }
 
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "Token não fornecido" });
-  const token = authHeader.split(" ")[1];
+export function verifyToken(req: AuthRequest, res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Token não fornecido" });
+  }
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Token inválido" });
+    return res.status(401).json({ message: "Token inválido ou expirado" });
   }
 }

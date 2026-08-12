@@ -1,16 +1,13 @@
 import { Router } from "express";
-import {
-  createProduct, listProducts, getProduct, updateProduct, deleteProduct
-} from "../controllers/productController";
-import { requireAuth } from "../middleware/auth";
-import { upload } from "../middleware/multer";
+import { createProduct, listProducts, getProduct, updateProduct, deleteProduct } from "../controllers/productController";
+import { verifyToken } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/", requireAuth, listProducts);
-router.get("/:id", requireAuth, getProduct);
-router.post("/", requireAuth, upload.single("imagem"), createProduct);
-router.put("/:id", requireAuth, upload.single("imagem"), updateProduct);
-router.delete("/:id", requireAuth, deleteProduct);
+router.post("/", verifyToken, createProduct);
+router.get("/", verifyToken, listProducts);
+router.get("/:id", verifyToken, getProduct);
+router.put("/:id", verifyToken, updateProduct);
+router.delete("/:id", verifyToken, deleteProduct);
 
 export default router;

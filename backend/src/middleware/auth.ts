@@ -1,24 +1,46 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
 
-dotenv.config();
-const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
-
-export interface AuthRequest extends Request {
-  user?: { id: number; email: string; perfil: string };
+interface AuthRequest extends Request {
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    companyId: string;
+  };
 }
 
-export function verifyToken(req: AuthRequest, res: Response, next: NextFunction) {
+const JWT_SECRET = process.env.JWT_SECRET || "secret";
+
+export const authMiddleware = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
   const token = req.headers.authorization?.split(" ")[1];
+
   if (!token) {
-    return res.status(401).json({ message: "Token não fornecido" });
+    res.status(401).json({ error: "Token não fornecido" });
+    return;
   }
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as AuthRequest["user"];
     req.user = decoded;
     next();
-  } catch (err) {
-    return res.status(401).json({ message: "Token inválido ou expirado" });
+  } catch (error) {
+    res.status(401).json({ error: "Token inválido" });
   }
-}
+};
+
+export const requireRole = (...roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ error: "Acesso negado" });
+      return;
+    }
+    next();
+  };
+};
+
+export type { AuthRequest };

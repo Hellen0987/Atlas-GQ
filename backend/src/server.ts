@@ -2,6 +2,10 @@ import express, { Express, Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
+import authRoutes from "./routes/auth.routes";
+import productRoutes from "./routes/product.routes";
+import saleRoutes from "./routes/sale.routes";
+import dashboardRoutes from "./routes/dashboard.routes";
 
 dotenv.config();
 
@@ -24,17 +28,23 @@ app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/sales", saleRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+
 // Error handling middleware
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error(err);
   res.status(err.status || 500).json({
-    error: err.message || "Internal server error",
+    error: err.message || "Erro interno do servidor",
   });
 });
 
 // 404
 app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({ error: "Rota não encontrada" });
 });
 
 app.listen(PORT, () => {
